@@ -1,0 +1,44 @@
+# -------------------------------------------------------------
+# LAMMPS Input Script: Uniaxial Tensile Test of 2D Silicon Carbide (SiC)
+# -------------------------------------------------------------
+
+units           metal
+dimension       3
+boundary        p p p
+atom_style      atomic
+
+# --- Atomic Structure & Potential Setup ---
+read_data       data.sic
+pair_style      tersoff
+pair_coeff      * * SiC.tersoff Si C
+
+# --- Simulation Box & Mass Definitions ---
+mass            1 28.0855  # Si
+mass            2 12.011   # C
+
+# --- Thermodynamic Output Setup ---
+thermo          1000
+thermo_style    custom step temp pe ke etotal press pxx pyy pzz lx ly lz
+
+# --- Equilibration Phase (NPT Ensemble) ---
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+fix             1 all npt temp 300.0 300.0 0.1 iso 0.0 0.0 1.0
+timestep        0.001
+run             20000
+unfix 1
+
+# --- Uniaxial Tension (Deformation in X-Direction) ---
+reset_timestep  0
+fix             1 all nvt temp 300.0 300.0 0.1
+fix             2 all deform 1 x erate 0.001 units box remap x
+
+# --- Compute Stress & Strain ---
+variable        strain equal "(lx - lx0) / lx0"
+variable        p1 equal "-pxx / 10000"  # Stress in GPa
+
+# --- Dump Trajectories for OVITO ---
+dump            1 all custom 1000 trajectory.lammpstrj id type x y z
+dump_modify     1 sort id
+
+# --- Execute Deformation ---
+run             50000
