@@ -1,0 +1,45 @@
+# -------------------------------------------------------------
+# LAMMPS Input Script: Crack Propagation in 2D Silicon Carbide (SiC)
+# -------------------------------------------------------------
+
+units           metal
+dimension       3
+boundary        p p p
+atom_style      atomic
+
+# --- Atomic Configuration & Potential ---
+read_data       data.sic
+pair_style      tersoff
+pair_coeff      * * SiC.tersoff Si C
+
+# --- Pre-Crack Void Geometry ---
+# Deleting atoms in a central slot region to introduce a pre-existing crack
+region          crack_slot block -10.0 10.0 -2.0 2.0 INF INF units box
+delete_atoms    region crack_slot
+
+# --- System Mass Definitions ---
+mass            1 28.0855  # Si
+mass            2 12.011   # C
+
+# --- Output Setup ---
+thermo          500
+thermo_style    custom step temp pe ke etotal press pxx pyy pzz
+
+# --- Equilibration ---
+velocity        all create 300.0 87654 mom yes rot yes dist gaussian
+fix             1 all npt temp 300.0 300.0 0.1 iso 0.0 0.0 1.0
+timestep        0.001
+run             10000
+unfix 1
+
+# --- Fracture Loading (Mode-I Tension) ---
+reset_timestep  0
+fix             1 all nvt temp 300.0 300.0 0.1
+fix             2 all deform 1 y erate 0.0005 units box remap x
+
+# --- Dump Fracture Trajectories for OVITO ---
+dump            1 all custom 500 crack_propagation.lammpstrj id type x y z
+dump_modify     1 sort id
+
+# --- Execute Fracture Simulation ---
+run             40000
